@@ -21,6 +21,8 @@ STATIC EFI_EVENT            mRtcVirtualAddrChangeEvent;
 STATIC EFI_EVENT            mRtcExitBootServicesEvent;
 STATIC EFI_EVENT            mRtcMemoryInitEvent;
 
+#define BCD_VALID(Value)  ((Value < 0xa0) && ((Value & 0xf) < 0xa))
+
 STATIC
 EFI_STATUS
 I2cMasterXferWorker (
@@ -126,12 +128,47 @@ LibGetTime (
   }
 
   Time->Nanosecond = 0;
-  Time->Second     = BcdToDecimal8 (DateTime.Seconds & RA8900CE_SECONDS_MASK);
-  Time->Minute     = BcdToDecimal8 (DateTime.Minutes & RA8900CE_MINUTES_MASK);
-  Time->Hour       = BcdToDecimal8 (DateTime.Hours & RA8900CE_HOURS_MASK);
-  Time->Day        = BcdToDecimal8 (DateTime.Days & RA8900CE_DAYS_MASK);
-  Time->Month      = BcdToDecimal8 (DateTime.Months & RA8900CE_MONTHS_MASK);
-  Time->Year       = BcdToDecimal8 (DateTime.Years) + EPOCH_BASE;
+  if (BCD_VALID (DateTime.Seconds)) {
+    Time->Second = BcdToDecimal8 (DateTime.Seconds & RA8900CE_SECONDS_MASK);
+  } else {
+    DEBUG ((DEBUG_ERROR, "%a: invalid second 0x%x\n", __FUNCTION__, DateTime.Seconds));
+    return EFI_DEVICE_ERROR;
+  }
+
+  if (BCD_VALID (DateTime.Minutes)) {
+    Time->Minute = BcdToDecimal8 (DateTime.Minutes & RA8900CE_MINUTES_MASK);
+  } else {
+    DEBUG ((DEBUG_ERROR, "%a: invalid minute 0x%x\n", __FUNCTION__, DateTime.Minutes));
+    return EFI_DEVICE_ERROR;
+  }
+
+  if (BCD_VALID (DateTime.Hours)) {
+    Time->Hour = BcdToDecimal8 (DateTime.Hours & RA8900CE_HOURS_MASK);
+  } else {
+    DEBUG ((DEBUG_ERROR, "%a: invalid hour 0x%x\n", __FUNCTION__, DateTime.Hours));
+    return EFI_DEVICE_ERROR;
+  }
+
+  if (BCD_VALID (DateTime.Days)) {
+    Time->Day = BcdToDecimal8 (DateTime.Days & RA8900CE_DAYS_MASK);
+  } else {
+    DEBUG ((DEBUG_ERROR, "%a: invalid day 0x%x\n", __FUNCTION__, DateTime.Days));
+    return EFI_DEVICE_ERROR;
+  }
+
+  if (BCD_VALID (DateTime.Months)) {
+    Time->Month = BcdToDecimal8 (DateTime.Months & RA8900CE_MONTHS_MASK);
+  } else {
+    DEBUG ((DEBUG_ERROR, "%a: invalid month 0x%x\n", __FUNCTION__, DateTime.Months));
+    return EFI_DEVICE_ERROR;
+  }
+
+  if (BCD_VALID (DateTime.Years)) {
+    Time->Year = BcdToDecimal8 (DateTime.Years) + EPOCH_BASE;
+  } else {
+    DEBUG ((DEBUG_ERROR, "%a: invalid year 0x%x\n", __FUNCTION__, DateTime.Years));
+    return EFI_DEVICE_ERROR;
+  }
 
   Reg = RA8900CE_TMR_CNT_REG_OFFSET;
 
@@ -324,15 +361,30 @@ LibGetWakeupTime (
 
     DEBUG ((DEBUG_INFO, "%a: alarm at day %x %x:%x\n", __FUNCTION__, Buffer[3], Buffer[2], Buffer[1]));
     if (!(Buffer[1] & RA8900CE_ALARM_REG_AE)) {
-      Time->Minute = BcdToDecimal8 (Buffer[1]) & RA8900CE_MINUTES_MASK;
+      if (BCD_VALID (Buffer[1])) {
+        Time->Minute = BcdToDecimal8 (Buffer[1]) & RA8900CE_MINUTES_MASK;
+      } else {
+        DEBUG ((DEBUG_ERROR, "%a: invalid alarm minute 0x%x\n", __FUNCTION__, Buffer[1]));
+        return EFI_DEVICE_ERROR;
+      }
     }
 
     if (!(Buffer[2] & RA8900CE_ALARM_REG_AE)) {
-      Time->Hour = BcdToDecimal8 (Buffer[2]) & RA8900CE_HOURS_MASK;
+      if (BCD_VALID (Buffer[2])) {
+        Time->Hour = BcdToDecimal8 (Buffer[2]) & RA8900CE_HOURS_MASK;
+      } else {
+        DEBUG ((DEBUG_ERROR, "%a: invalid alarm hour 0x%x\n", __FUNCTION__, Buffer[2]));
+        return EFI_DEVICE_ERROR;
+      }
     }
 
     if (!(Buffer[3] & RA8900CE_ALARM_REG_AE)) {
-      Time->Day = BcdToDecimal8 (Buffer[3]) & RA8900CE_DAYS_MASK;
+      if (BCD_VALID (Buffer[3])) {
+        Time->Day = BcdToDecimal8 (Buffer[3]) & RA8900CE_DAYS_MASK;
+      } else {
+        DEBUG ((DEBUG_ERROR, "%a: invalid alarm day 0x%x\n", __FUNCTION__, Buffer[3]));
+        return EFI_DEVICE_ERROR;
+      }
     }
 
     Buffer[0] = RA8900CE_MONTH_REG_OFFSET;
@@ -349,8 +401,19 @@ LibGetWakeupTime (
 
     Status = I2cMasterXferWorker (mHost, RA8900CE_DEVICE_ADDRESS, (VOID *)&GetOp);
     if (!EFI_ERROR (Status)) {
-      Time->Month = BcdToDecimal8 (Buffer[1] & RA8900CE_MONTHS_MASK);
-      Time->Year  = BcdToDecimal8 (Buffer[2] & RA8900CE_YEARS_MASK) + EPOCH_BASE;
+      if (BCD_VALID (Buffer[1])) {
+        Time->Month = BcdToDecimal8 (Buffer[1] & RA8900CE_MONTHS_MASK);
+      } else {
+        DEBUG ((DEBUG_ERROR, "%a: invalid alarm month 0x%x\n", __FUNCTION__, Buffer[1]));
+        return EFI_DEVICE_ERROR;
+      }
+
+      if (BCD_VALID (Buffer[2])) {
+        Time->Year = BcdToDecimal8 (Buffer[2] & RA8900CE_YEARS_MASK) + EPOCH_BASE;
+      } else {
+        DEBUG ((DEBUG_ERROR, "%a: invalid alarm year 0x%x\n", __FUNCTION__, Buffer[2]));
+        return EFI_DEVICE_ERROR;
+      }
     } else {
       DEBUG ((DEBUG_INFO, "Get RTC month and year error!\n"));
       return EFI_DEVICE_ERROR;
@@ -437,8 +500,19 @@ LibSetWakeupTime (
 
       Status = I2cMasterXferWorker (mHost, RA8900CE_DEVICE_ADDRESS, (VOID *)&GetOp);
       if (!EFI_ERROR (Status)) {
-        Time->Month = BcdToDecimal8 (Buffer[1] & RA8900CE_MONTHS_MASK);
-        Time->Year  = BcdToDecimal8 (Buffer[2] & RA8900CE_YEARS_MASK) + EPOCH_BASE;
+        if (BCD_VALID (Buffer[1])) {
+          Time->Month = BcdToDecimal8 (Buffer[1] & RA8900CE_MONTHS_MASK);
+        } else {
+          DEBUG ((DEBUG_ERROR, "%a: invalid alarm month 0x%x\n", __FUNCTION__, Buffer[1]));
+          return EFI_DEVICE_ERROR;
+        }
+
+        if (BCD_VALID (Buffer[2])) {
+          Time->Year = BcdToDecimal8 (Buffer[2] & RA8900CE_YEARS_MASK) + EPOCH_BASE;
+        } else {
+          DEBUG ((DEBUG_ERROR, "%a: invalid alarm year 0x%x\n", __FUNCTION__, Buffer[2]));
+          return EFI_DEVICE_ERROR;
+        }
       } else {
         DEBUG ((DEBUG_INFO, "Get RTC month and year error!\n"));
         return EFI_DEVICE_ERROR;

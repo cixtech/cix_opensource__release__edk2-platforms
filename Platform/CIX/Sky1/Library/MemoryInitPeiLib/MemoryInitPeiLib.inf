@@ -62,6 +62,7 @@
   gCixPlatformTokenSpaceGuid.PcdReservedShareMemorySize
   gCixPlatformTokenSpaceGuid.PcdReservedFwShareMemoryBase
   gCixPlatformTokenSpaceGuid.PcdReservedFwShareMemorySize
+  gCixPlatformTokenSpaceGuid.PcdRamdiskEnable
 
 [Depex]
   TRUE

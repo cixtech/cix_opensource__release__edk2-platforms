@@ -255,6 +255,9 @@
   INF Platform/CIX/Sky1/Application/ABSelect/ABSelect.inf
   INF Platform/CIX/Sky1/Drivers/AndroidConfigDxe/AndroidConfigDxe.inf
 !endif
+!if $(LINUX_AB_BOOT_SELECT) == TRUE
+  INF Platform/CIX/Sky1/Application/LinuxBootSelect/LinuxBootSelect.inf
+!endif
   #INF Platform/CIX/Sky1/Application/HelloWorld/HelloWorld.inf
   #INF MdeModulePkg/Application/HelloWorld/HelloWorld.inf
   #

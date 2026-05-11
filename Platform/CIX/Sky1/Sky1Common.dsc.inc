@@ -593,6 +593,10 @@
   gCixTokenSpaceGuid.PcdSystemTableSelect|0x00
 !endif
 
+!if $(TOKEN_RAM_DISK_SUPPORT) == TRUE
+  gCixPlatformTokenSpaceGuid.PcdRamdiskEnable|TRUE
+!endif
+
 [PcdsPatchableInModule]
   gEfiMdeModulePkgTokenSpaceGuid.PcdSerialClockRate|500000000
 !if $(TARGET) == RELEASE
@@ -1015,7 +1019,7 @@ ShellPkg/DynamicCommand/HttpDynamicCommand/HttpDynamicCommand.inf {
   Platform/CIX/Sky1/Application/ABSelect/ABSelect.inf 
   Platform/CIX/Sky1/Drivers/AndroidConfigDxe/AndroidConfigDxe.inf 
 !endif
-
+  Platform/CIX/Sky1/Application/LinuxBootSelect/LinuxBootSelect.inf
 !if $(PD_FW_UPDATE_ENABLE) == TRUE
   Platform/CIX/Sky1/Application/PdFwUpdate/PdFwUpdate.inf
 !endif

@@ -83,7 +83,6 @@
   gCixPlatformTokenSpaceGuid.PcdAcpiGpio4IoMask
   gCixPlatformTokenSpaceGuid.PcdAcpiGpio5IoMask
   gCixPlatformTokenSpaceGuid.PcdAcpiPrefPmProf
-  gCixPlatformTokenSpaceGuid.PcdTPMPPIMemoryBase
 
   gCixTokenSpaceGuid.PcdI2c0MutexId
   gCixTokenSpaceGuid.PcdI2c1MutexId

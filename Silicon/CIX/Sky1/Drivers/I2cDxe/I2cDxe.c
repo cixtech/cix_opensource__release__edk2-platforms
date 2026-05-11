@@ -243,7 +243,7 @@ I2cMemoryInitEventNotify (
           (MemSpaceMap[Index].GcdMemoryType == EfiGcdMemoryTypeMemoryMappedIo))
       {
         DEBUG ((DEBUG_INFO, "%a: memory space base 0x%x, length 0x%x already added\n", __FUNCTION__, RuntimeMmioRegionBase, RuntimeMmioRegionSize));
-        return;
+        continue;
       }
     }
 

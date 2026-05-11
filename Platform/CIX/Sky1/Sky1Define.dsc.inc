@@ -122,6 +122,7 @@
   DEFINE FTPM_SUPPORT               = FALSE
   DEFINE DEBUG_MODE_SUPPORT         = FALSE
   DEFINE EFUSE_OEM_KEY_ENABLE       = FALSE
+  DEFINE LINUX_AB_BOOT_SELECT       = FALSE
   #
   #[Variable setup]
   #
