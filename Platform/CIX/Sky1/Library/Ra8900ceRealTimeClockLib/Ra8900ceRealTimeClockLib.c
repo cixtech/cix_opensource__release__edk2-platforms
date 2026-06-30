@@ -748,6 +748,39 @@ RtcDeviceInitialize (
     SetOp.Operation[0].Buffer        = (VOID *)&InitSeq[0];
 
     Status = I2cMasterXferWorker (mHost, RA8900CE_DEVICE_ADDRESS, (VOID *)&SetOp);
+    if (!EFI_ERROR (Status)) {
+      UINT8  AlarmReg[4];
+      UINT8  AlarmInit[4];
+
+      AlarmReg[0] = RA8900CE_ALARM_REG_OFFSET;
+
+      GetOp.OperationCount = 2;
+
+      GetOp.SetAddressOp.Flags         = 0;
+      GetOp.SetAddressOp.LengthInBytes = 1;
+      GetOp.SetAddressOp.Buffer        = &AlarmReg[0];
+
+      GetOp.GetDateTimeOp.Flags         = I2C_FLAG_READ;
+      GetOp.GetDateTimeOp.LengthInBytes = 3;
+      GetOp.GetDateTimeOp.Buffer        = (VOID *)&AlarmReg[1];
+
+      Status = I2cMasterXferWorker (mHost, RA8900CE_DEVICE_ADDRESS, (VOID *)&GetOp);
+      if (!EFI_ERROR (Status)) {
+        if (!(BCD_VALID (AlarmReg[1]) && BCD_VALID (AlarmReg[2]) && BCD_VALID (AlarmReg[3]))) {
+          AlarmInit[0] = RA8900CE_ALARM_REG_OFFSET;
+          AlarmInit[1] = RA8900CE_ALARM_REG_AE;
+          AlarmInit[2] = RA8900CE_ALARM_REG_AE;
+          AlarmInit[3] = RA8900CE_ALARM_REG_AE;
+
+          SetOp.OperationCount             = 1;
+          SetOp.Operation[0].Flags         = 0;
+          SetOp.Operation[0].LengthInBytes = sizeof (AlarmInit);
+          SetOp.Operation[0].Buffer        = (VOID *)&AlarmInit[0];
+          Status                           = I2cMasterXferWorker (mHost, RA8900CE_DEVICE_ADDRESS, (VOID *)&SetOp);
+          DEBUG ((DEBUG_INFO, "%a: invalid alarm clock value, set alarm clock to default value - %r\n", __FUNCTION__, Status));
+        }
+      }
+    }
   }
 
   return Status;

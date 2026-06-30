@@ -298,6 +298,12 @@
   # NVMe boot devices
   #
   INF Platform/CIX/Sky1/Drivers/NvmExpressDxe/NvmExpressDxe.inf
+  #
+  # SATA/AHCI boot devices
+  #
+  INF MdeModulePkg/Bus/Pci/SataControllerDxe/SataControllerDxe.inf
+  INF MdeModulePkg/Bus/Ata/AtaBusDxe/AtaBusDxe.inf
+  INF MdeModulePkg/Bus/Ata/AtaAtapiPassThru/AtaAtapiPassThru.inf
 !endif
 
 !if $(CAPSULE_ENABLE) == TRUE
@@ -332,6 +338,9 @@
 !endif
 !if $(FW_VERSION_ENABLE) == TRUE
   INF Platform/CIX/Sky1/Drivers/FwVersionDxe/FwVersionProtocolTest.inf
+!endif
+!if $(TFA_CONFIG_UPDATE_SUPPORT) == TRUE
+  INF Platform/CIX/Sky1/Drivers/TrustZoneConfigUpdateDxe/TrustZoneConfigUpdateDxe.inf
 !endif
 !if $(NETWORK_ENABLE) == TRUE
   #

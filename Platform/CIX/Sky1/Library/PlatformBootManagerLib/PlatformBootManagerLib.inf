@@ -76,6 +76,7 @@
   gEfiMdeModulePkgTokenSpaceGuid.PcdBootDiscoveryPolicy
   gCixPlatformTokenSpaceGuid.PcdAndroidBoot
   gEfiMdeModulePkgTokenSpaceGuid.PcdPlatformRecoverySupport           ## CONSUMES
+  gCixPlatformTokenSpaceGuid.PcdRegisterFastBootSupport
 
 [Guids]
   gBootDiscoveryPolicyMgrFormsetGuid
@@ -95,6 +96,8 @@
   gCixExitConsoleCallBackGuid
   gCixFarmEnableFlagGuid
   gCixLinuxBootSelectGuid
+  gCixFastBootAppGuid
+  gPlatformSetupVariableGuid
 
 [Protocols]
   gEdkiiNonDiscoverableDeviceProtocolGuid

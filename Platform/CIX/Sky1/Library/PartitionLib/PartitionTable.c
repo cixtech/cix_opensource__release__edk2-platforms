@@ -518,17 +518,39 @@ SetBootId  (
   UINT8  SelectBootId
   )
 {
-  EFI_STATUS  Status = EFI_SUCCESS;
+  EFI_STATUS  Status;
+  EFI_STATUS  GetStatus;
+  UINT32      Attr;
+  UINTN       DataSize;
+  UINT8       ExistingId;
+
+  Attr      = 0;
+  DataSize  = sizeof (ExistingId);
+  GetStatus = gRT->GetVariable (
+                     SELECT_BOOT_ID,
+                     &gCixGlobalVariableGuid,
+                     &Attr,
+                     &DataSize,
+                     &ExistingId
+                     );
+  if (EFI_ERROR (GetStatus)) {
+    if (GetStatus == EFI_NOT_FOUND) {
+      Attr = EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS;
+    } else {
+      DebugPrint (DEBUG_INFO, "SetBootId: GetVariable SelectBootId failed: %r\n", GetStatus);
+      return GetStatus;
+    }
+  }
 
   gSelectBootId = SelectBootId;
   Status        = gRT->SetVariable (
                          SELECT_BOOT_ID,
                          &gCixGlobalVariableGuid,
-                         EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS,
+                         Attr,
                          sizeof (gSelectBootId),
                          &gSelectBootId
                          );
-
+  DebugPrint (DEBUG_INFO, "SetBootId: SelectBootId:%d Status:%r \n", SelectBootId, Status);
   return Status;
 }
 

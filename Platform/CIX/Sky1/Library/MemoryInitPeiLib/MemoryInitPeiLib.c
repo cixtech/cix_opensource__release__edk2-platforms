@@ -252,6 +252,12 @@ MemoryPeim (
     EfiRuntimeServicesData
     );
 
+  BuildMemoryAllocationHob (
+    FixedPcdGet32 (PcdReservedAudioBase),
+    FixedPcdGet32 (PcdReservedAudioSize),
+    EfiReservedMemoryType
+    );
+
   // Build Memory Allocation Hob
   InitMmu (MemoryTable);
 

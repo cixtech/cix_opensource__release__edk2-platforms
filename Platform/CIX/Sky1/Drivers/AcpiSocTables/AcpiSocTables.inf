@@ -26,6 +26,7 @@
 #  Madt.aslc
   Dbg2.aslc
   Iort.aslc
+  Iort-NoSmmu.aslc
   Sdei.aslc
   Csrt.aslc
   Spcr.aslc
@@ -108,5 +109,6 @@
   gCixTokenSpaceGuid.PcdAcpiI2s7Enable
   gCixTokenSpaceGuid.PcdAcpiI2s8Enable
   gCixTokenSpaceGuid.PcdAcpiI2s9Enable
+  gCixTokenSpaceGuid.PcdAudioHdaEn
 
   gCixPlatformTokenSpaceGuid.PcdTpm2AcpiBufferBase

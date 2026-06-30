@@ -51,6 +51,8 @@
   gArmPlatformTokenSpaceGuid.PcdArmLcdDdrFrameBufferSize
   gCixPlatformTokenSpaceGuid.PcdReservedLinuxBase
   gCixPlatformTokenSpaceGuid.PcdReservedLinuxSize
+  gCixPlatformTokenSpaceGuid.PcdReservedAudioBase
+  gCixPlatformTokenSpaceGuid.PcdReservedAudioSize
   gCixPlatformTokenSpaceGuid.PcdReservedAndroidBase
   gCixPlatformTokenSpaceGuid.PcdReservedAndroidSize
   gCixTokenSpaceGuid.PcdGpuEnable
