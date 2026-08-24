@@ -14,7 +14,6 @@ Device (VUS0) {
   Name (_STA, 0x0B)
 
   Name (_CRS, ResourceTemplate () {
-    PinGroupFunction(Exclusive, 0x0, "\\_SB.MUX1", 0, "usb_drive_vbus0", ResourceConsumer,)
     GpioIo (Exclusive, PullNone, 0, 0, IoRestrictionOutputOnly,
     "\\_SB.GPI4", 0, ResourceConsumer) { 29 } // GPIO040
   })
@@ -41,7 +40,6 @@ Device (VUS4) {
   Name (_STA, 0x0B)
 
   Name (_CRS, ResourceTemplate () {
-    PinGroupFunction(Exclusive, 0x0, "\\_SB.MUX1", 0, "usb_drive_vbus4", ResourceConsumer,)
     GpioIo (Exclusive, PullNone, 0, 0, IoRestrictionOutputOnly,
     "\\_SB.GPI4", 0, ResourceConsumer) { 30 } // GPIO041
   })
@@ -68,7 +66,6 @@ Device (VUS5) {
   Name (_STA, 0x0B)
 
   Name (_CRS, ResourceTemplate () {
-    PinGroupFunction(Exclusive, 0x0, "\\_SB.MUX1", 0, "usb_drive_vbus5", ResourceConsumer,)
     GpioIo (Exclusive, PullNone, 0, 0, IoRestrictionOutputOnly,
     "\\_SB.GPI4", 0, ResourceConsumer) { 31 } // GPIO042
   })

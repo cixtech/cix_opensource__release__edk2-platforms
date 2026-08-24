@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="firmware">
-  <id>com.cixtch.firmware</id>
+  <id>com.cixtech.evb.firmware</id>
   <name>CIX SKY1 EVB PHECDA BIOS</name>
   <summary>BIOS for CIX sky1 evb platform</summary>
   <description>
@@ -14,14 +14,22 @@
   <project_license>proprietary</project_license>
   <developer_name>CIX Technology</developer_name>
   <releases>
-    <release version="7" date="2026-06-11">
+    <release urgency="high" version="10" date="2026-06-11">
       <description>
-      <p>CIX EVB BIOS version 7</p>
+        <p>CIX EVB BIOS version 10</p>
+        <ul>
+          <li>support cab file update</li>
+          <li>support Fastboot hotkey</li>
+        </ul>
       </description>
     </release>
   </releases>
+ <categories>
+  <category>X-System</category>
+ </categories>
   <custom>
     <value key="LVFS::UpdateProtocol">org.uefi.capsule</value>
     <value key="LVFS::UpdateCategory">X-System</value>
+    <value key="LVFS::VersionFormat">number</value>
   </custom>
 </component>

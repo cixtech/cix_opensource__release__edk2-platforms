@@ -134,6 +134,7 @@ typedef struct {
   UINT8     SmmuEnable;
   UINT8     SPEEnable;
   UINT8     FastBootHotKeyEnable;
+  UINT8     ForceToRecovery;
 } PLATFORM_SETUP_DATA;
 
 typedef struct {

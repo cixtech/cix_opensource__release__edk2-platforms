@@ -58,7 +58,7 @@ External (\_SB.DPR5, DeviceObj)
 //Camera power enable 0
 Device (CPE0) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x03)
+  Name (_UID, 0x02)
   Name (_STA, 0x0B)
 
   Name (_CRS, ResourceTemplate () {
@@ -81,7 +81,7 @@ Device (CPE0) {
 //Camera power enable 1
 Device (CPE1) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x04)
+  Name (_UID, 0x03)
   Name (_STA, 0x0B)
 
   Name (_CRS, ResourceTemplate () {
@@ -104,7 +104,7 @@ Device (CPE1) {
 //Camera power enable 2
 Device (CPE2) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x05)
+  Name (_UID, 0x04)
   Name (_STA, 0x0B)
 
   Name (_CRS, ResourceTemplate () {
@@ -127,7 +127,7 @@ Device (CPE2) {
 //Camera power enable 3
 Device (CPE3) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x06)
+  Name (_UID, 0x05)
   Name (_STA, 0x0B)
 
   Name (_CRS, ResourceTemplate () {

@@ -143,3 +143,6 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 #string STR_FASTBOOT_HOTKEY                              #language en-US "Fastboot hotkey (F)"
 #string STR_FASTBOOT_HOTKEY_HELP                         #language en-US "Enable or disable pressing F during boot countdown to enter Fastboot."
+
+#string STR_FORCE_TO_RECOVERY                            #language en-US "Force to recovery"
+#string STR_FORCE_TO_RECOVERY_HELP                       #language en-US "Enable or Disable recovery BIOS forcedly."

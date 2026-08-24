@@ -85,6 +85,7 @@
   DEFINE POWER_BUTTON_ENABLE        = TRUE
   DEFINE DEBUG_MODE_SUPPORT         = TRUE
   DEFINE CIX_GPNV_ENABLE            = TRUE
+  DEFINE BIOS_BACKUP_RECOVERY       = FALSE
 
 !if $(COMPILE_FASTBOOT_LOAD) == nvme
   DEFINE PCIE_HOST_ENABLE           = TRUE
@@ -417,7 +418,12 @@
 
   gCixTokenSpaceGuid.PcdCixProcessorVersion|L"CIX P1 CP8180"
   # Platform Flash Region for Save Vendor Defined Variable
+!if $(BIOS_BACKUP_RECOVERY) == TRUE
+  gCixPlatformTokenSpaceGuid.PcdBiosBackupRecovery|TRUE
+  gCixPlatformTokenSpaceGuid.PcdNorFlashVarSyncRegionBase|0xFF0000   # SIZE_16MB-64KB
+!else
   gCixPlatformTokenSpaceGuid.PcdNorFlashVarSyncRegionBase|0x7F0000   # SIZE_8MB-64KB
+!endif
   gCixPlatformTokenSpaceGuid.PcdNorFlashVarSyncRegionSize|0x10000    # SIZE_64KB
 
   gCixPlatformTokenSpaceGuid.PcdDTPMSupport|$(DTPM_SUPPORT)
@@ -426,6 +432,8 @@
   gCixPlatformTokenSpaceGuid.PcdDTPMSpiChipSelect|0x1   # 1:Slave Select 0   2:Slave Select 1
 
   gCixPlatformTokenSpaceGuid.PcdRegisterFastBootSupport|TRUE
+
+  gEfiMdeModulePkgTokenSpaceGuid.PcdMaxSizeNonPopulateCapsule|0x1700000
 
 [PcdsDynamicDefault.common]
 

@@ -17,34 +17,280 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Protocol/WatchdogTimer.h>
+#include <Protocol/DiskIo.h>
+#include <FirmwareLayout.h>
+#include <PlatformSetupVar.h>
 
 #define MAX_CAPSULE_NUM  10
+
+enum BOOT_LOADER_3_RECOVERY_STATE {
+  BOOT_LOADER_3_RECOVERY_STATE_INIT_STATE_0              = 0,
+  BOOT_LOADER_3_RECOVERY_STATE_IN_PROGRESS               = 1,
+  BOOT_LOADER_3_RECOVERY_STATE_COMPLETE_BUT_NOT_BOOT     = 2,
+  BOOT_LOADER_3_RECOVERY_STATE_COMPLETE_AND_BOOT_SUCCESS = 3,
+  BOOT_LOADER_3_RECOVERY_STATE_FORCE_TO_RECOVERY         = 0xFE,
+  BOOT_LOADER_3_RECOVERY_STATE_INIT_STATE_1              = 0xFF
+};
 
 //
 // Define how many block descriptors we want to test with.
 //
-UINTN  NumberOfDescriptors = 1;
+UINTN                 NumberOfDescriptors = 1;
+EFI_DISK_IO_PROTOCOL  *NorFlashDiskIo     = NULL;
+UINT8                 MediaId             = 0;
+
+STATIC
+BOOLEAN
+IsNorFlashDevicePath (
+  EFI_DEVICE_PATH_PROTOCOL  *DevicePath
+  )
+{
+  EFI_DEVICE_PATH_PROTOCOL  *TempDevicePath;
+  VENDOR_DEVICE_PATH        *VendorDevicePath;
+
+  TempDevicePath = DevicePath;
+  while (!IsDevicePathEnd (TempDevicePath)) {
+    if ((DevicePathType (TempDevicePath) == HARDWARE_DEVICE_PATH) &&
+        (DevicePathSubType (TempDevicePath) == HW_VENDOR_DP))
+    {
+      VendorDevicePath = (VENDOR_DEVICE_PATH *)TempDevicePath;
+      if (CompareGuid (&(VendorDevicePath->Guid), &gCixNorFlashDevicePathGuid)) {
+        return TRUE;
+      }
+    }
+
+    TempDevicePath = NextDevicePathNode (TempDevicePath);
+  }
+
+  return FALSE;
+}
 
 STATIC
 EFI_STATUS
-BeforeCapsuleUpdateHook(
+LocateNorFlashDiskIoProtocol (
+  )
+{
+  EFI_HANDLE                *DiskIoHandles;
+  UINTN                     NumberDiskIoHandles;
+  UINTN                     Index;
+  EFI_DEVICE_PATH_PROTOCOL  *DevicePath;
+  EFI_STATUS                Status;
+
+  // find DiskIoProtocol
+  Status = gBS->LocateHandleBuffer (
+                  ByProtocol,
+                  &gEfiDiskIoProtocolGuid,
+                  NULL,
+                  &NumberDiskIoHandles,
+                  &DiskIoHandles
+                  );
+
+  if (EFI_ERROR (Status)) {
+    return EFI_NOT_FOUND;
+  }
+
+  for (Index = 0; Index < NumberDiskIoHandles; Index++) {
+    DevicePath = DevicePathFromHandle (DiskIoHandles[Index]);
+    if (!DevicePath) {
+      continue;
+    }
+
+    if (IsNorFlashDevicePath (DevicePath)) {
+      MediaId = ((NOR_FLASH_DEVICE_PATH *)DevicePath)->Index;
+      Status  = gBS->HandleProtocol (DiskIoHandles[Index], &gEfiDiskIoProtocolGuid, (VOID **)&NorFlashDiskIo);
+      if (!EFI_ERROR (Status)) {
+        FreePool (DiskIoHandles);
+        return EFI_SUCCESS;
+      }
+    }
+  }
+
+  FreePool (DiskIoHandles);
+  return EFI_NOT_FOUND;
+}
+
+STATIC
+EFI_STATUS
+GetFirmwareHeaderAddress (
+  OUT UINTN  *Address
+  )
+{
+  EFI_STATUS  Status = EFI_NOT_FOUND;
+  UINT32      Signature;
+
+  Status = NorFlashDiskIo->ReadDisk (NorFlashDiskIo, MediaId, FIRMWARE_HEADER_OFFSET, sizeof (UINT32), &Signature);
+  if (!EFI_ERROR (Status) && (Signature == FIRMWARE_HEADER_SIGNATURE)) {
+    *Address =  FIRMWARE_HEADER_OFFSET;
+    Status   = EFI_SUCCESS;
+  } else {
+    Status = NorFlashDiskIo->ReadDisk (NorFlashDiskIo, MediaId, FIRMWARE_HEADER_OFFSET_ALT, sizeof (UINT32), &Signature);
+    if (!EFI_ERROR (Status) && (Signature == FIRMWARE_HEADER_SIGNATURE)) {
+      *Address = FIRMWARE_HEADER_OFFSET_ALT;
+      Status   = EFI_SUCCESS;
+    } else {
+      Status = EFI_NOT_FOUND;
+    }
+  }
+
+  return Status;
+}
+
+STATIC
+EFI_STATUS
+EFIAPI
+FindFirmwareEntry (
+  IN  FIRMWARE_TYPE  Type,
+  OUT UINT32         *Base,
+  OUT UINT32         *Length
+  )
+{
+  EFI_STATUS       Status;
+  UINT32           Index;
+  UINTN            Address;
+  FIRMWARE_HEADER  Header;
+  FIRMWARE_HEADER  *HeaderPtr;
+  UINTN            HeaderSize;
+  FIRMWARE_ENTRY   *Entry;
+
+  if ((Base == NULL) || (Length == NULL)) {
+    DEBUG ((DEBUG_ERROR, "%a: base or length is NULL\n", __FUNCTION__));
+    return EFI_INVALID_PARAMETER;
+  }
+
+  Status = GetFirmwareHeaderAddress (&Address);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: firmware base address not match\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  Status = NorFlashDiskIo->ReadDisk (NorFlashDiskIo, MediaId, Address, sizeof (FIRMWARE_HEADER), (UINT8 *)&Header);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: read firmware header failed\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  HeaderSize = sizeof (FIRMWARE_HEADER) + (Header.EntryCount - 1) * sizeof (FIRMWARE_ENTRY);
+  HeaderPtr  = (FIRMWARE_HEADER *)AllocateZeroPool (HeaderSize);
+  if (HeaderPtr == NULL) {
+    DEBUG ((DEBUG_ERROR, "%a: failed to allocate memory for entry\n", __FUNCTION__));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  Status = NorFlashDiskIo->ReadDisk (NorFlashDiskIo, MediaId, Address, HeaderSize, (UINT8 *)HeaderPtr);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: read firmware entry failed\n", __FUNCTION__));
+    FreePool (HeaderPtr);
+    return EFI_NOT_FOUND;
+  }
+
+  for (Index = 0; Index < HeaderPtr->EntryCount; Index++) {
+    Entry = &(HeaderPtr->EntryNode[Index]);
+    if (Entry->Type == Type) {
+      *Base   = Entry->Base;
+      *Length = Entry->Length;
+
+      FreePool (HeaderPtr);
+      return EFI_SUCCESS;
+    }
+  }
+
+  FreePool (HeaderPtr);
+  return EFI_NOT_FOUND;
+}
+
+STATIC
+EFI_STATUS
+GetBootloader3RecoveryConfig (
+  OUT UINT8  *RecoveryMode,
+  OUT UINT8  *BootState,
+  OUT UINT8  *BootRetryCount
+  )
+{
+  EFI_STATUS                          Status;
+  UINT32                              Base;
+  UINT32                              Length;
+  BOOT_LOADER_3_RECOVERY_CONFIG_DATA  RecoveryConfig;
+
+  Status = FindFirmwareEntry (BOOT_LOADER_3_RECOVERY_CONFIG, &Base, &Length);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: find bootloader3 recovery config failed\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  Status = NorFlashDiskIo->ReadDisk (NorFlashDiskIo, MediaId, Base, sizeof (BOOT_LOADER_3_RECOVERY_CONFIG_DATA), (UINT8 *)&RecoveryConfig);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: read bootloader3 recovery config failed\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  *RecoveryMode   = RecoveryConfig.RecoveryMode;
+  *BootState      = RecoveryConfig.BootState;
+  *BootRetryCount = RecoveryConfig.BootRetryCount;
+
+  return EFI_SUCCESS;
+}
+
+STATIC
+EFI_STATUS
+SetBootloader3RecoveryConfig (
+  IN UINT8  RecoveryMode,
+  IN UINT8  BootState,
+  IN UINT8  BootRetryCount
+  )
+{
+  EFI_STATUS                          Status;
+  UINT32                              Base;
+  UINT32                              Length;
+  BOOT_LOADER_3_RECOVERY_CONFIG_DATA  RecoveryConfig;
+
+  Status = FindFirmwareEntry (BOOT_LOADER_3_RECOVERY_CONFIG, &Base, &Length);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: find bootloader3 recovery config failed\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  Status = NorFlashDiskIo->ReadDisk (NorFlashDiskIo, MediaId, Base, sizeof (BOOT_LOADER_3_RECOVERY_CONFIG_DATA), (UINT8 *)&RecoveryConfig);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: read bootloader3 recovery config failed\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  RecoveryConfig.RecoveryMode   = RecoveryMode;
+  RecoveryConfig.BootState      = BootState;
+  RecoveryConfig.BootRetryCount = BootRetryCount;
+
+  Status = NorFlashDiskIo->WriteDisk (NorFlashDiskIo, MediaId, Base, sizeof (BOOT_LOADER_3_RECOVERY_CONFIG_DATA), (UINT8 *)&RecoveryConfig);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: write bootloader3 recovery config failed\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  return EFI_SUCCESS;
+}
+
+STATIC
+EFI_STATUS
+BeforeCapsuleUpdateHook (
   VOID
-)
+  )
 {
   EFI_STATUS                        Status = EFI_SUCCESS;
   UINTN                             VarSize;
   UINT32                            VarAttr;
   UINT8                             CapsuleUpdateEnabled;
   EFI_WATCHDOG_TIMER_ARCH_PROTOCOL  *Wdt = NULL;
+  UINT8                             RecoveryMode;
+  UINT8                             BootState;
+  UINT8                             BootRetryCount;
 
   VarSize = sizeof (UINT8);
-  Status = gRT->GetVariable (
-                  L"CapsuleUpdate",
-                  &gCixGPNVGuid,
-                  &VarAttr,
-                  &VarSize,
-                  &CapsuleUpdateEnabled
-                  );
+  Status  = gRT->GetVariable (
+                   L"CapsuleUpdate",
+                   &gCixGPNVGuid,
+                   &VarAttr,
+                   &VarSize,
+                   &CapsuleUpdateEnabled
+                   );
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "%a: get capsule update variable failed: %r\n", __FUNCTION__, Status));
   } else {
@@ -59,11 +305,11 @@ BeforeCapsuleUpdateHook(
                     );
   }
 
-#ifdef CIX_GPNV_ENABLE
-  CixGPNVSync(
+ #ifdef CIX_GPNV_ENABLE
+  CixGPNVSync (
     &gCixGPNVGuid,
-    FixedPcdGet32(PcdNorFlashVarSyncRegionBase),
-    FixedPcdGet32(PcdNorFlashVarSyncRegionSize),
+    FixedPcdGet32 (PcdNorFlashVarSyncRegionBase),
+    FixedPcdGet32 (PcdNorFlashVarSyncRegionSize),
     SIZE_4KB
     );
  #endif
@@ -77,17 +323,165 @@ BeforeCapsuleUpdateHook(
     Wdt->SetTimerPeriod (Wdt, 0);
   }
 
+  if (FixedPcdGetBool (PcdBiosBackupRecovery) == TRUE) {
+    Status = LocateNorFlashDiskIoProtocol ();
+    if (!EFI_ERROR (Status)) {
+      Status = GetBootloader3RecoveryConfig (&RecoveryMode, &BootState, &BootRetryCount);
+      DEBUG ((DEBUG_INFO, "%a: RecoveryMode: %d, BootState: %d, BootRetryCount: %d\n", __FUNCTION__, RecoveryMode, BootState, BootRetryCount));
+      if (!EFI_ERROR (Status)) {
+        BootState      = BOOT_LOADER_3_RECOVERY_STATE_IN_PROGRESS;
+        BootRetryCount = 0;
+        Status         = SetBootloader3RecoveryConfig (RecoveryMode, BootState, BootRetryCount);
+        if (EFI_ERROR (Status)) {
+          DEBUG ((DEBUG_ERROR, "%a: set bootloader3 recovery config failed\n", __FUNCTION__));
+        }
+      }
+    }
+  }
+
   return Status;
 }
 
 STATIC
 EFI_STATUS
-AfterCapsuleUpdateHook(
+AfterCapsuleUpdateHook (
   VOID
-)
+  )
 {
+  EFI_STATUS  Status = EFI_SUCCESS;
+  UINT8       RecoveryMode;
+  UINT8       BootFlag;
+  UINT8       BootRetryCount;
 
-  return EFI_SUCCESS;
+  if (FixedPcdGetBool (PcdBiosBackupRecovery) == TRUE) {
+    Status = LocateNorFlashDiskIoProtocol ();
+    if (!EFI_ERROR (Status)) {
+      Status = GetBootloader3RecoveryConfig (&RecoveryMode, &BootFlag, &BootRetryCount);
+      if (!EFI_ERROR (Status)) {
+        DEBUG ((DEBUG_INFO, "%a: RecoveryMode: %d, BootState: %d, BootRetryCount: %d\n", __FUNCTION__, RecoveryMode, BootFlag, BootRetryCount));
+        BootFlag       = BOOT_LOADER_3_RECOVERY_STATE_COMPLETE_BUT_NOT_BOOT;
+        RecoveryMode   = FALSE;
+        BootRetryCount = 0;
+        Status         = SetBootloader3RecoveryConfig (RecoveryMode, BootFlag, BootRetryCount);
+        if (EFI_ERROR (Status)) {
+          DEBUG ((DEBUG_ERROR, "%a: set bootloader3 recovery config failed\n", __FUNCTION__));
+        }
+      }
+    }
+  }
+
+  return Status;
+}
+
+VOID
+EFIAPI
+ReadyToBootEventCallback (
+  EFI_EVENT  Event,
+  VOID       *Context
+  )
+{
+  EFI_STATUS           Status         = EFI_SUCCESS;
+  UINT8                RecoveryMode   = FALSE;
+  UINT8                BootRetryCount = 0;
+  UINT8                BootFlag;
+  UINT8                RecoveryBootFlag;
+  BOOLEAN              ResetFlag = FALSE;
+  PLATFORM_SETUP_DATA  PlatformSetupVar;
+  UINTN                VarSize;
+  UINT32               VarAttr;
+
+  Status = LocateNorFlashDiskIoProtocol ();
+  if (!EFI_ERROR (Status)) {
+    Status = GetBootloader3RecoveryConfig (&RecoveryMode, &BootFlag, &BootRetryCount);
+    if (!EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_INFO, "%a: RecoveryMode: %d, BootState: %d, BootRetryCount: %d\n", __FUNCTION__, RecoveryMode, BootFlag, BootRetryCount));
+      if ((BootFlag != BOOT_LOADER_3_RECOVERY_STATE_COMPLETE_AND_BOOT_SUCCESS) || (BootRetryCount != 0)) {
+        BootFlag       = BOOT_LOADER_3_RECOVERY_STATE_COMPLETE_AND_BOOT_SUCCESS;
+        BootRetryCount = 0;
+        Status         = SetBootloader3RecoveryConfig (RecoveryMode, BootFlag, BootRetryCount);
+        if (EFI_ERROR (Status)) {
+          DEBUG ((DEBUG_ERROR, "%a: set bootloader3 recovery config failed\n", __FUNCTION__));
+        }
+      }
+
+      VarSize = sizeof (RecoveryBootFlag);
+      Status  = gRT->GetVariable (
+                       L"RecoveryBootFlag",
+                       &gCixGPNVGuid,
+                       &VarAttr,
+                       &VarSize,
+                       &RecoveryBootFlag
+                       );
+      if (Status == EFI_NOT_FOUND) {
+        VarAttr          = EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS;
+        RecoveryBootFlag = RecoveryMode;
+        Status           = gRT->SetVariable (
+                                  L"RecoveryBootFlag",
+                                  &gCixGPNVGuid,
+                                  VarAttr,
+                                  sizeof (RecoveryBootFlag),
+                                  &RecoveryBootFlag
+                                  );
+        if (EFI_ERROR (Status)) {
+          DEBUG ((DEBUG_ERROR, "%a: Set RecoveryBootFlag variable failed: %r\n", __FUNCTION__, Status));
+        }
+      } else if (!EFI_ERROR (Status)) {
+        if (RecoveryBootFlag != RecoveryMode) {
+          RecoveryBootFlag = RecoveryMode;
+          Status           = gRT->SetVariable (
+                                    L"RecoveryBootFlag",
+                                    &gCixGPNVGuid,
+                                    VarAttr,
+                                    sizeof (RecoveryBootFlag),
+                                    &RecoveryBootFlag
+                                    );
+          if (EFI_ERROR (Status)) {
+            DEBUG ((DEBUG_ERROR, "%a: Set RecoveryBootFlag variable failed: %r\n", __FUNCTION__, Status));
+          }
+        }
+      } else {
+        DEBUG ((DEBUG_ERROR, "%a: Get RecoveryBootFlag variable failed: %r\n", __FUNCTION__, Status));
+      }
+    }
+
+    VarSize = sizeof (PLATFORM_SETUP_DATA);
+    Status  = gRT->GetVariable (
+                     PLATFORM_SETUP_VAR,
+                     &gPlatformSetupVariableGuid,
+                     &VarAttr,
+                     &VarSize,
+                     &PlatformSetupVar
+                     );
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_ERROR, "%a: Get platform setup variable failed: %r\n", __FUNCTION__, Status));
+    } else if (PlatformSetupVar.ForceToRecovery == 0x01) {
+      ResetFlag                        = TRUE;
+      PlatformSetupVar.ForceToRecovery = 0x00;
+      Status                           = gRT->SetVariable (
+                                                PLATFORM_SETUP_VAR,
+                                                &gPlatformSetupVariableGuid,
+                                                VarAttr,
+                                                sizeof (PLATFORM_SETUP_DATA),
+                                                &PlatformSetupVar
+                                                );
+      if (EFI_ERROR (Status)) {
+        DEBUG ((DEBUG_ERROR, "%a: Set platform setup variable failed: %r\n", __FUNCTION__, Status));
+      }
+    }
+
+    if (ResetFlag == TRUE) {
+      BootFlag = BOOT_LOADER_3_RECOVERY_STATE_FORCE_TO_RECOVERY;
+      Status   = SetBootloader3RecoveryConfig (RecoveryMode, BootFlag, BootRetryCount);
+      if (EFI_ERROR (Status)) {
+        DEBUG ((DEBUG_ERROR, "%a: set bootloader3 recovery config failed\n", __FUNCTION__));
+      } else {
+        DEBUG ((DEBUG_INFO, "%a: reset system\n", __FUNCTION__));
+        gRT->ResetSystem (EfiResetWarm, EFI_SUCCESS, 0, NULL);
+      }
+    }
+  } else {
+    DEBUG ((DEBUG_ERROR, "%a: locate nor flash disk io protocol failed\n", __FUNCTION__));
+  }
 }
 
 /**
@@ -271,7 +665,7 @@ BuildGatherList (
 
         TempBlockPtr->Union.DataBlock = (UINTN)TempDataPtr;
         TempBlockPtr->Length          = Size;
-        DEBUG ((DEBUG_INFO, "%a: capsule block/size              0x%X/0x%X\n", __FUNCTION__ , (UINTN)TempDataPtr, Size));
+        DEBUG ((DEBUG_INFO, "%a: capsule block/size              0x%X/0x%X\n", __FUNCTION__, (UINTN)TempDataPtr, Size));
         SizeLeft    -= Size;
         TempDataPtr += Size;
         TempBlockPtr++;
@@ -468,7 +862,7 @@ AuthenticateAndUpdate (
     goto Done;
   }
 
-  BeforeCapsuleUpdateHook();
+  BeforeCapsuleUpdateHook ();
   //
   // Call the runtime service capsule.
   //
@@ -482,20 +876,22 @@ AuthenticateAndUpdate (
     DEBUG ((DEBUG_ERROR, "%a: failed to query capsule capability - %r\n", __FUNCTION__, Status));
     goto Done;
   }
+
   if (CapsuleBufferSize > MaxCapsuleSize) {
     DEBUG ((DEBUG_ERROR, "%a: capsule is too large to update, %ld is allowed\n", __FUNCTION__, MaxCapsuleSize));
     Status = EFI_UNSUPPORTED;
     goto Done;
   }
+
   Status = gRT->UpdateCapsule (CapsuleHeaderArray, 1, (UINTN)BlockDescriptors);
   if (Status != EFI_SUCCESS) {
     DEBUG ((DEBUG_ERROR, "%a: failed to update capsule - %r\n", __FUNCTION__, Status));
     goto Done;
   }
 
-  AfterCapsuleUpdateHook();
+  AfterCapsuleUpdateHook ();
 
-  gRT->ResetSystem (EfiResetPlatformSpecific, EFI_SUCCESS, 0, NULL);  //always to reset
+  gRT->ResetSystem (EfiResetPlatformSpecific, EFI_SUCCESS, 0, NULL);  // always to reset
 
 Done:
   CleanGatherList (BlockDescriptors, 1);
@@ -513,7 +909,7 @@ ProcessCapsuleOnDisk (
   EFI_SIMPLE_FILE_SYSTEM_PROTOCOL  *Fs;
   CHAR16                           *FileName;
   EFI_DEVICE_PATH_PROTOCOL         *DevicePath;
-  VOID                             *CapsuleBuffer = NULL;
+  VOID                             *CapsuleBuffer    = NULL;
   UINTN                            CapsuleBufferSize = 0;
   EFI_HANDLE                       *Handle;
   UINTN                            HandleNum;
@@ -534,8 +930,8 @@ ProcessCapsuleOnDisk (
   //
   // Get a valid file system from boot path
   //
-  Fs = NULL;
-  FileName = AllocateCopyPool (StrnSizeS(L"BIOS.cap", MAX_UINT16), L"BIOS.cap");
+  Fs       = NULL;
+  FileName = AllocateCopyPool (StrnSizeS (L"BIOS.cap", MAX_UINT16), L"BIOS.cap");
 
   for (Index = 0; Index < HandleNum; Index++) {
     DevicePath = DevicePathFromHandle (Handle[Index]);
@@ -547,17 +943,19 @@ ProcessCapsuleOnDisk (
         //
         Status = ReadUpdateFile (CapsuleBuffer, &CapsuleBufferSize, FileName, Fs);
         if (Status == EFI_BUFFER_TOO_SMALL) {
-          CapsuleBuffer = AllocateZeroPool(CapsuleBufferSize);
-          Status = ReadUpdateFile (CapsuleBuffer, &CapsuleBufferSize, FileName, Fs);
+          CapsuleBuffer = AllocateZeroPool (CapsuleBufferSize);
+          Status        = ReadUpdateFile (CapsuleBuffer, &CapsuleBufferSize, FileName, Fs);
         }
 
         if (!EFI_ERROR (Status)) {
           break;
         } else {
-          DEBUG ((DEBUG_ERROR, \
-                 "%a: capsule image could not be copied for update at %s\n", \
-                 __FUNCTION__, \
-                 ConvertDevicePathToText(DevicePath, TRUE,TRUE)));
+          DEBUG ((
+            DEBUG_ERROR, \
+            "%a: capsule image could not be copied for update at %s\n", \
+            __FUNCTION__, \
+            ConvertDevicePathToText (DevicePath, TRUE, TRUE)
+            ));
         }
       }
     }
@@ -568,7 +966,7 @@ ProcessCapsuleOnDisk (
     return;
   }
 
-  AuthenticateAndUpdate(CapsuleBuffer, CapsuleBufferSize);
+  AuthenticateAndUpdate (CapsuleBuffer, CapsuleBufferSize);
 }
 
 EFI_STATUS
@@ -578,30 +976,43 @@ CapsuleUpdateDxeEntryPoint (
   IN EFI_SYSTEM_TABLE  *SystemTable
   )
 {
-  EFI_STATUS             Status = EFI_SUCCESS;
-  VOID                   *Registration;
-  UINTN                  VarSize;
-  UINT8                  CapsuleUpdateEnabled;
+  EFI_STATUS  Status = EFI_SUCCESS;
+  VOID        *Registration;
+  UINTN       VarSize;
+  UINT8       CapsuleUpdateEnabled;
+  EFI_EVENT   ReadyToBootEvent;
 
   VarSize = sizeof (UINT8);
-  Status = gRT->GetVariable (
-                  L"CapsuleUpdate",
-                  &gCixGPNVGuid,
-                  NULL,
-                  &VarSize,
-                  &CapsuleUpdateEnabled
-                  );
+  Status  = gRT->GetVariable (
+                   L"CapsuleUpdate",
+                   &gCixGPNVGuid,
+                   NULL,
+                   &VarSize,
+                   &CapsuleUpdateEnabled
+                   );
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "%a: get capsule update variable failed: %r\n", __FUNCTION__, Status));
   } else {
-    if(CapsuleUpdateEnabled == 1) {
+    if (CapsuleUpdateEnabled == 1) {
       EfiCreateProtocolNotifyEvent (
-            &gEfiSimpleFileSystemProtocolGuid,
-            TPL_CALLBACK,
-            ProcessCapsuleOnDisk,
-            NULL,
-            &Registration
-            );
+        &gEfiSimpleFileSystemProtocolGuid,
+        TPL_CALLBACK,
+        ProcessCapsuleOnDisk,
+        NULL,
+        &Registration
+        );
+    }
+  }
+
+  if (FixedPcdGetBool (PcdBiosBackupRecovery) == TRUE) {
+    Status = EfiCreateEventReadyToBootEx (
+               TPL_CALLBACK,
+               ReadyToBootEventCallback,
+               NULL,
+               &ReadyToBootEvent
+               );
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_ERROR, "%a: Create Event Ready To Boot failed: %r\n", __FUNCTION__, Status));
     }
   }
 

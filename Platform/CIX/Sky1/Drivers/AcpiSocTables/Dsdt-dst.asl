@@ -5,7 +5,7 @@
 #include "CommonDefines.h"
 Device (DSTD) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x0)
+  Name (_UID, 0x80)
   Name (_STA, 0xF)
   Name (_CRS, ResourceTemplate () {
     Memory32Fixed (ReadWrite, RDR_RES_BASE, RDR_RES_SIZE)
@@ -32,7 +32,7 @@ Device (DSTD) {
   })
   Device (EXTR) {
     Name (_HID, "PRP0001")
-    Name (_UID, 0x1)
+    Name (_UID, 0x82)
     Name (_STA, 0xF)
     Name (_DSD, Package () {
       ToUUID ("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
@@ -45,7 +45,7 @@ Device (DSTD) {
   }
     Device (APAD) {
     Name (_HID, "PRP0001")
-    Name (_UID, 0x2)
+    Name (_UID, 0x83)
     Name (_STA, 0xF)
     Name (_CRS, ResourceTemplate () {
       Memory32Fixed (ReadWrite, MNTNDUMP_ADDR, MNTNDUMP_SIZE)
@@ -81,7 +81,7 @@ Device (DSTD) {
 // For ramoops driver
 Device (RAOP) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x12)
+  Name (_UID, 0x90)
   Name (_STA, 0x3)
   Name (_CRS, ResourceTemplate () {
     Memory32Fixed (ReadWrite, RAMOOPS_RES_BASE, RAMOOPS_RES_SIZE)
@@ -98,7 +98,7 @@ Device (RAOP) {
 }
 Device (DCT0) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x83)
+  Name (_UID, 0x84)
   Name (_STA, 0x3)
   Name (_CRS, ResourceTemplate () {
     Memory32Fixed (ReadWrite, 0x0C010000, 0x20000)
@@ -115,7 +115,7 @@ Device (DCT0) {
 }
 Device (DCT1) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x84)
+  Name (_UID, 0x85)
   Name (_STA, 0x3)
   Name (_CRS, ResourceTemplate () {
     Memory32Fixed (ReadWrite, 0x0C030000, 0x20000)
@@ -132,7 +132,7 @@ Device (DCT1) {
 }
 Device (DCT2) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x85)
+  Name (_UID, 0x86)
   Name (_STA, 0x3)
   Name (_CRS, ResourceTemplate () {
     Memory32Fixed (ReadWrite, 0x0C050000, 0x20000)
@@ -149,7 +149,7 @@ Device (DCT2) {
 }
 Device (DCT3) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x86)
+  Name (_UID, 0x87)
   Name (_STA, 0x3)
   Name (_CRS, ResourceTemplate () {
     Memory32Fixed (ReadWrite, 0x0C070000, 0x20000)
@@ -167,7 +167,7 @@ Device (DCT3) {
 // For se_pm_crash driver
 Device (SEPM) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x10)
+  Name (_UID, 0x8A)
   Name (_STA, 0x3)
   Name (_DSD, Package () {
     ToUUID ("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
@@ -179,7 +179,7 @@ Device (SEPM) {
 // For dst_mbox_client device
 Device (DSMC) {
   Name (_HID, "PRP0001")
-  Name (_UID, 0x11)
+  Name (_UID, 0x91)
   Name (_STA, 0x3)
   Name (_DSD, Package () {
     ToUUID ("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),

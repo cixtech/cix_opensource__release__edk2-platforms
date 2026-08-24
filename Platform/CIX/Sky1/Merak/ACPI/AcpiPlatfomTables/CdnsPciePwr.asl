@@ -10,7 +10,7 @@ External (\_SB.PRC4, DeviceObj)
 
   Device (PVC3) {
     Name (_HID, "PRP0001")
-    Name (_UID, 0x23)
+    Name (_UID, 0x00)
     Name (_STA, 0x0B)
 
     Name (_CRS, ResourceTemplate () {
@@ -35,7 +35,7 @@ External (\_SB.PRC4, DeviceObj)
 
   Device (PVC4) {
     Name (_HID, "PRP0001")
-    Name (_UID, 0x40)
+    Name (_UID, 0x01)
     Name (_STA, 0x0B)
 
     Name (_CRS, ResourceTemplate () {

@@ -167,6 +167,9 @@ Device (SUB0)
             Package () { "maximum-speed", "super-speed-plus" },
             Package () { "dr_mode", "otg" },
             Package () { "cdnsp,usb3-phy", \_SB.UCP0.USBP },
+#if USBC0_VBUS_OVERRIDE
+            Package () { "cdnsp-vbus-override", 1 },
+#endif
           },
       USB_REMOTE_PD_DSD("usb-role-switch")
     })
@@ -866,6 +869,9 @@ Device (SUB4)
             Package () { "maximum-speed", "super-speed-plus" },
             Package () { "dr_mode", "host" },
             Package () { "cdnsp,usb3-phy", \_SB.U3P4.USB0 },
+#if USBA4_VBUS_OVERRIDE
+            Package () { "cdnsp-vbus-override", 1 },
+#endif
           },
     })
 
@@ -956,6 +962,9 @@ Device (SUB5)
             Package () { "maximum-speed", "super-speed-plus" },
             Package () { "dr_mode", "host" },
             Package () { "cdnsp,usb3-phy", \_SB.U3P4.USB1 },
+#if USBA5_VBUS_OVERRIDE
+            Package () { "cdnsp-vbus-override", 1 },
+#endif
           },
     })
 

@@ -42,6 +42,7 @@
 
 [Guids]
   gEfiEventExitBootServicesGuid
+  gEfiEventReadyToBootGuid
 
 [Protocols]
   gCixFwVersionProtocolGuid

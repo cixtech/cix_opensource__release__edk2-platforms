@@ -42,15 +42,20 @@
 [Protocols]
   gEfiSimpleFileSystemProtocolGuid
   gEfiWatchdogTimerArchProtocolGuid
+  gEfiDiskIoProtocolGuid
+  gEfiDevicePathToTextProtocolGuid
 
 [Guids]
   gCixGPNVGuid
+  gPlatformSetupVariableGuid
+  gCixNorFlashDevicePathGuid
 
 [FeaturePcd]
 
 [Pcd]
   gCixPlatformTokenSpaceGuid.PcdNorFlashVarSyncRegionBase
   gCixPlatformTokenSpaceGuid.PcdNorFlashVarSyncRegionSize
+  gCixPlatformTokenSpaceGuid.PcdBiosBackupRecovery
 
 [FixedPcd]
 

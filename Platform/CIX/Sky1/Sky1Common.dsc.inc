@@ -432,13 +432,13 @@
 
   gEfiMdePkgTokenSpaceGuid.PcdReportStatusCodePropertyMask|0x07
 
-  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIReclaimMemory|0
+  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIReclaimMemory|0x50
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIMemoryNVS|0
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiReservedMemoryType|0
-  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiRuntimeServicesData|0x450
+  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiRuntimeServicesData|0x1000
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiRuntimeServicesCode|1200
-  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiBootServicesCode|1500
-  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiBootServicesData|13000
+  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiBootServicesCode|2000
+  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiBootServicesData|18000
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiLoaderCode|0x1000
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiLoaderData|0
   gEmbeddedTokenSpaceGuid.PcdDmaDeviceOffset|0x00000000
@@ -556,8 +556,6 @@
   # ACPI
   #
   gEfiMdeModulePkgTokenSpaceGuid.PcdAcpiExposedTableVersions|0x20
-  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIReclaimMemory|0
-  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIMemoryNVS|0
 
   # Clearing BIT0 in this PCD prevents installing a 32-bit SMBIOS entry point,
   # if the entry point version is >= 3.0. AARCH64 OSes cannot assume the
@@ -1049,6 +1047,9 @@ ShellPkg/DynamicCommand/HttpDynamicCommand/HttpDynamicCommand.inf {
   # Platform/CIX/Sky1/Drivers/ScmiRuntimeDxe/ScmiRuntimeDxe.inf
 !if $(POWER_BUTTON_ENABLE) == TRUE
   Platform/CIX/Sky1/Drivers/PowerButtonDxe/PowerButtonDxe.inf
+!endif
+!if $(GPIO_POWER_BUTTON_ENABLE) == TRUE
+  Platform/CIX/Sky1/Drivers/PowerButtonDxe/GpioPowerButtonDxe.inf
 !endif
 
 !if $(DTPM_SUPPORT) == TRUE || $(FTPM_SUPPORT) == TRUE

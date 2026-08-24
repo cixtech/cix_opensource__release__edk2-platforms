@@ -125,18 +125,18 @@ UpdateConfigParams (
       ConfigData->Fch.I2c[i].BusFreq = PlatformSetupVar.I2cBusFreq[i];
     }
 
-    ConfigData->Usb20[0].Enable     = PlatformSetupVar.Usb2Control0Enable;
-    ConfigData->Usb20[1].Enable     = PlatformSetupVar.Usb2Control1Enable;
-    ConfigData->Usb20[2].Enable     = PlatformSetupVar.Usb2Control2Enable;
-    ConfigData->Usb20[3].Enable     = PlatformSetupVar.Usb2Control3Enable;
-    ConfigData->Usb32Drd[0].Enable  = PlatformSetupVar.Usb3Control0Enable;
-    ConfigData->Usb32Drd[1].Enable  = PlatformSetupVar.Usb3Control1Enable;
+    ConfigData->Usb20[0].Enable      = PlatformSetupVar.Usb2Control0Enable;
+    ConfigData->Usb20[1].Enable      = PlatformSetupVar.Usb2Control1Enable;
+    ConfigData->Usb20[2].Enable      = PlatformSetupVar.Usb2Control2Enable;
+    ConfigData->Usb20[3].Enable      = PlatformSetupVar.Usb2Control3Enable;
+    ConfigData->Usb32Drd[0].Enable   = PlatformSetupVar.Usb3Control0Enable;
+    ConfigData->Usb32Drd[1].Enable   = PlatformSetupVar.Usb3Control1Enable;
     ConfigData->Usb32Drd[0].DataRole = PlatformSetupVar.Usb3Control0DataRole;
-    ConfigData->UsbCDrd[0].Enable   = PlatformSetupVar.UsbCDrdControl0Enable;
-    ConfigData->UsbC[0].Enable      = PlatformSetupVar.UsbCControl0Enable;
-    ConfigData->UsbC[1].Enable      = PlatformSetupVar.UsbCControl1Enable;
-    ConfigData->UsbC[2].Enable      = PlatformSetupVar.UsbCControl2Enable;
-    ConfigData->UsbCDrd[0].DataRole = PlatformSetupVar.UsbCDrdControl0DataRole;
+    ConfigData->UsbCDrd[0].Enable    = PlatformSetupVar.UsbCDrdControl0Enable;
+    ConfigData->UsbC[0].Enable       = PlatformSetupVar.UsbCControl0Enable;
+    ConfigData->UsbC[1].Enable       = PlatformSetupVar.UsbCControl1Enable;
+    ConfigData->UsbC[2].Enable       = PlatformSetupVar.UsbCControl2Enable;
+    ConfigData->UsbCDrd[0].DataRole  = PlatformSetupVar.UsbCDrdControl0DataRole;
 
     ConfigData->Gmac[0].Enable     =  PlatformSetupVar.GmacEnable[0];
     ConfigData->Gmac[1].Enable     =  PlatformSetupVar.GmacEnable[1];
@@ -263,6 +263,7 @@ UpdatePlatformConfigParams (
     ConfigData->LightSensorCtrl  = PlatformSetupVar.LightSensorCtrl;
     ConfigData->SpcrEnable       = PlatformSetupVar.SpcrEnable;
     ConfigData->EcFanMode        = PlatformSetupVar.EcFanMode;
+    ConfigData->ForceToRecovery  = PlatformSetupVar.ForceToRecovery;
   }
 
   SystemTableVarSize = sizeof (SYSTEM_TABLE);
@@ -496,6 +497,7 @@ ConstructSetupVariable (
   PlatformSetupVar->EcFanMode             = FixedPcdGetBool (PcdEcDefaultFanMode);
   PlatformSetupVar->SmmuEnable            = FixedPcdGetBool (PcdAcpiSmmuEnable);
   PlatformSetupVar->FastBootHotKeyEnable  = 0x0;
+  PlatformSetupVar->ForceToRecovery       = 0x00;
 
   PlatformSetupVar->Usb2Control0Enable      = FixedPcdGetBool (PcdUsb2Control0Enable);
   PlatformSetupVar->Usb2Control1Enable      = FixedPcdGetBool (PcdUsb2Control1Enable);

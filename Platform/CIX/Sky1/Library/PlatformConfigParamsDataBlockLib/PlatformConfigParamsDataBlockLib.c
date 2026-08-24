@@ -34,7 +34,8 @@ PLATFORM_CONFIG_PARAMS_DATA_BLOCK  mPlatformConfigParamsDataBlock = {
   {
     0x01 // default usb only mode
   },
-  FixedPcdGet8 (PcdEcDefaultFanMode)
+  FixedPcdGet8 (PcdEcDefaultFanMode),
+  0x00,      // ForceToRecovery
 };
 
 PLATFORM_CONFIG_PARAMS_DATA_ENTRY  mPlatformConfigDataEntryTable[] = {
@@ -65,6 +66,7 @@ PLATFORM_CONFIG_PARAMS_DATA_ENTRY  mPlatformConfigDataEntryTable[] = {
   { PARAMS_DATA_TYPEC2_MODE_ID,         PLATFORM_PARAMS_DATA_OFFSET_SIZE (TypecMode[2]),      PARAMS_DATA_MULTI_OPTION_TYPE, L"Typec2 Mode",              L"0:device, 1:usb, 2:dp-only, 3:dp+usb"                    },
   { PARAMS_DATA_TYPEC3_MODE_ID,         PLATFORM_PARAMS_DATA_OFFSET_SIZE (TypecMode[3]),      PARAMS_DATA_MULTI_OPTION_TYPE, L"Typec3 Mode",              L"0:device, 1:usb, 2:dp-only, 3:dp+usb"                    },
   { PARAMS_DATA_EC_FAN_MODE_ID,         PLATFORM_PARAMS_DATA_OFFSET_SIZE (EcFanMode),         PARAMS_DATA_MULTI_OPTION_TYPE, L"EC Fan Mode",              L"0:Auto Mode, 1:Performance mode"                         },
+  { PARAMS_DATA_FORCE_TO_RECOVERY_ID,   PLATFORM_PARAMS_DATA_OFFSET_SIZE (ForceToRecovery),   PARAMS_DATA_MULTI_OPTION_TYPE, L"Force to recovery",        L"0:No, 1:Yes"                                             },
 };
 
 UINT32  mPlatformConfigDataEntryNum = sizeof (mPlatformConfigDataEntryTable) / sizeof (PLATFORM_CONFIG_PARAMS_DATA_ENTRY);

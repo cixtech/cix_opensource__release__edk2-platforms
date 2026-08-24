@@ -116,10 +116,20 @@ endif;
       endoneof;
 #endif
 
-suppressif NOT FixedPcdGetBool (PcdRegisterFastBootSupport);
+suppressif FixedPcdGetBool (PcdRegisterFastBootSupport) == FALSE;
       oneof varid   = PlatformSetupVar.FastBootHotKeyEnable,
         prompt      = STRING_TOKEN(STR_FASTBOOT_HOTKEY),
         help        = STRING_TOKEN(STR_FASTBOOT_HOTKEY_HELP),
+        default     = 0x0,
+        option text = STRING_TOKEN(STR_DISABLED), value = 0, flags = RESET_REQUIRED;
+        option text = STRING_TOKEN(STR_ENABLED), value = 1, flags = RESET_REQUIRED;
+      endoneof;
+endif;
+
+suppressif FixedPcdGetBool (PcdBiosBackupRecovery) == FALSE;
+      oneof varid   = PlatformSetupVar.ForceToRecovery,
+        prompt      = STRING_TOKEN(STR_FORCE_TO_RECOVERY),
+        help        = STRING_TOKEN(STR_FORCE_TO_RECOVERY_HELP),
         default     = 0x0,
         option text = STRING_TOKEN(STR_DISABLED), value = 0, flags = RESET_REQUIRED;
         option text = STRING_TOKEN(STR_ENABLED), value = 1, flags = RESET_REQUIRED;

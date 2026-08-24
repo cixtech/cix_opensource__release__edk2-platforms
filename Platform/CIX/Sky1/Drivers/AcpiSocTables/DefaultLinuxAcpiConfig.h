@@ -47,6 +47,11 @@
 #define USBC3_DEF_PMODE     USBC_PHY_MODE_COMBO
 #define USBC3_DISABLE_USB3  0
 
+// USB0/4/5 VBUS override (default: off)
+#define USBC0_VBUS_OVERRIDE  0
+#define USBA4_VBUS_OVERRIDE  0
+#define USBA5_VBUS_OVERRIDE  0
+
 #define USBC0_OC_EN  1
 #define USBC1_OC_EN  1
 #define USBC2_OC_EN  1

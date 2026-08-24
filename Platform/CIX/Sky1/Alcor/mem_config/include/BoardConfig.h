@@ -1,0 +1,12 @@
+#ifndef _BOARD_CONFIG_H_
+#define _BOARD_CONFIG_H_
+
+#define ALCOR_4G_ID  0
+#define ALCOR_8G_ID  1
+#define ALCOR_16G_ID 2
+
+#define ALCOR_4G_MASK     BOARD_ID_MASK(ALCOR_4G_ID)
+#define ALCOR_8G_MASK     BOARD_ID_MASK(ALCOR_8G_ID)
+#define ALCOR_16G_MASK    BOARD_ID_MASK(ALCOR_16G_ID)
+
+#endif

@@ -35,7 +35,7 @@
 
 #define DP_PORT_INIT(RemoteDeviceReference0, RemotePipeline0, RemotePort0, RemoteEndPoint0, \
                       RemoteDeviceReference1, RemotePipeline1, RemotePort1, RemoteEndPoint1, \
-                      DpLaneNumber, DpMaxRate, AuxClockDivider, DpPhyRef, EdpPanelRef) \
+                      DpLaneNumber, DpMaxRate, AuxClockDivider, DpPhyRef, EdpPanelRef, DpPortId) \
  Name (_DSD, Package () { \
             ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),\
             Package () { \
@@ -45,6 +45,7 @@
                 Package () { "dp_phy", DpPhyRef }, \
                 Package () { "edp-panel", EdpPanelRef }, \
                 Package () { "enabled_by_gop", 0 }, \
+                Package () { "cfg_adapter_port", DpPortId }, \
             /*    Package () { "support_d3_cmd", D3Cmd }, */ \
             },\
             ToUUID("dbb8e3e6-5886-4ba6-8795-1319f52a966b"),\
@@ -266,7 +267,7 @@ Device (DP00) {
   })
 
   //DP_PORT_INIT(\_SB.DPU0, "pipeline@0", "port@0", "endpoint@0", 1, 162000, 200, \_SB.UCP0.UDPP, EMPTY_STR)
-  DP_PORT_INIT(\_SB.DPU0, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU0, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, \_SB.UCP0.UDPP, EMPTY_STR)
+  DP_PORT_INIT(\_SB.DPU0, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU0, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, \_SB.UCP0.UDPP, EMPTY_STR, 0)
 
   Name (CLKT, Package() {
     Package() {CLK_TREE_DPC0_VIDCLK0, "vid_clk0", \_SB.DP00},
@@ -300,7 +301,7 @@ Device (DP01) {
   })
 
   //DP_PORT_INIT(\_SB.DPU1, "pipeline@0", "port@0", "endpoint@0", 1, 162000, 200, \_SB.UCP1.UDPP, EMPTY_STR)
-  DP_PORT_INIT(\_SB.DPU1, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU1, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, \_SB.UCP1.UDPP, EMPTY_STR)
+  DP_PORT_INIT(\_SB.DPU1, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU1, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, \_SB.UCP1.UDPP, EMPTY_STR, 1)
 
   Name (CLKT, Package() {
     Package() {CLK_TREE_DPC1_VIDCLK0, "vid_clk0", \_SB.DP01},
@@ -334,7 +335,7 @@ Device (DP02) {
   })
 
   //DP_PORT_INIT(\_SB.DPU2, "pipeline@0", "port@0", "endpoint@0", 1, 540000, 200, EMPTY_STR, \_SB.EDP0)
-  DP_PORT_INIT(\_SB.DPU2, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU2, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, EMPTY_STR, \_SB.EDP0)
+  DP_PORT_INIT(\_SB.DPU2, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU2, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, EMPTY_STR, \_SB.EDP0, 2)
 
   Name (CLKT, Package() {
     Package() {CLK_TREE_DPC2_VIDCLK0, "vid_clk0", \_SB.DP02},
@@ -370,7 +371,7 @@ Device (DP03) {
   })
 
   //DP_PORT_INIT(\_SB.DPU3, "pipeline@0", "port@0", "endpoint@0", 1, 162000, 200, \_SB.UCP2.UDPP, EMPTY_STR)
-  DP_PORT_INIT(\_SB.DPU3, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU3, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, \_SB.UCP2.UDPP, EMPTY_STR)
+  DP_PORT_INIT(\_SB.DPU3, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU3, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, \_SB.UCP2.UDPP, EMPTY_STR, 3)
 
   Name (CLKT, Package() {
     Package() {CLK_TREE_DPC3_VIDCLK0, "vid_clk0", \_SB.DP03},
@@ -404,7 +405,7 @@ Device (DP04) {
   })
 
   //DP_PORT_INIT(\_SB.DPU4, "pipeline@0", "port@0", "endpoint@0", 1, 162000, 200, \_SB.UCP3.UDPP, EMPTY_STR)
-  DP_PORT_INIT(\_SB.DPU4, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU4, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, \_SB.UCP3.UDPP, EMPTY_STR)
+  DP_PORT_INIT(\_SB.DPU4, "pipeline@0", "port@0", "endpoint@0", \_SB.DPU4, "pipeline@1", "port@1", "endpoint@1", 1, 540000, 200, \_SB.UCP3.UDPP, EMPTY_STR, 4)
 
   Name (CLKT, Package() {
     Package() {CLK_TREE_DPC4_VIDCLK0, "vid_clk0", \_SB.DP04},

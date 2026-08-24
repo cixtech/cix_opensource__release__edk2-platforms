@@ -388,6 +388,312 @@ UpdateBoardInfo (
   SetBoardInfo ();
 }
 
+STATIC EFI_ALLOCATE_PAGES    mOriginalAllocatePages   = NULL;
+STATIC EFI_PHYSICAL_ADDRESS  mAllocPagesLimitAddr     = 0;
+STATIC EFI_PHYSICAL_ADDRESS  mAllocPagesForbiddenEnd  = 0;
+STATIC BOOLEAN               mAllocPagesHookInstalled = FALSE;
+
+/**
+  Hooked AllocatePages: after ReadyToBoot, for EfiLoaderCode:
+  - AllocateAny/Max: keep below mAllocPagesLimitAddr
+  - AllocateAddress: allow unless range overlaps
+    [mAllocPagesLimitAddr, mAllocPagesForbiddenEnd] (Entry[1] region)
+  Other memory types use the original AllocatePages.
+**/
+STATIC
+EFI_STATUS
+EFIAPI
+AllocatePagesHook (
+  IN     EFI_ALLOCATE_TYPE     Type,
+  IN     EFI_MEMORY_TYPE       MemoryType,
+  IN     UINTN                 NumberOfPages,
+  IN OUT EFI_PHYSICAL_ADDRESS  *Memory
+  )
+{
+  EFI_PHYSICAL_ADDRESS  MaxAddress;
+  EFI_ALLOCATE_TYPE     NewType;
+  EFI_PHYSICAL_ADDRESS  EndAddress;
+
+  if (mOriginalAllocatePages == NULL) {
+    return EFI_UNSUPPORTED;
+  }
+
+  // Non-LoaderCode: keep original AllocatePages behavior.
+  if ((MemoryType != EfiLoaderCode) || (Memory == NULL) || (mAllocPagesLimitAddr == 0)) {
+    return mOriginalAllocatePages (Type, MemoryType, NumberOfPages, Memory);
+  }
+
+  // AllocateMaxAddress: uppermost allocated address must be <= MaxAddress.
+  MaxAddress = mAllocPagesLimitAddr - 1;
+  NewType    = Type;
+
+  switch (Type) {
+    case AllocateAnyPages:
+      NewType = AllocateMaxAddress;
+      *Memory = MaxAddress;
+      break;
+
+    case AllocateMaxAddress:
+      if (*Memory > MaxAddress) {
+        *Memory = MaxAddress;
+      }
+
+      break;
+
+    case AllocateAddress:
+      // Allow any fixed address that does not overlap the protected window
+      // [mAllocPagesLimitAddr, mAllocPagesForbiddenEnd] (== Entry[1]).
+      EndAddress = *Memory + (EFI_PHYSICAL_ADDRESS)NumberOfPages * EFI_PAGE_SIZE - 1;
+      if ((mAllocPagesForbiddenEnd >= mAllocPagesLimitAddr) &&
+          (*Memory <= mAllocPagesForbiddenEnd) &&
+          (EndAddress >= mAllocPagesLimitAddr))
+      {
+        DEBUG ((
+          DEBUG_ERROR,
+          "%a: reject AllocateAddress 0x%lx-0x%lx pages 0x%lx (forbidden 0x%lx-0x%lx)\n",
+          __FUNCTION__,
+          *Memory,
+          EndAddress,
+          (UINT64)NumberOfPages,
+          mAllocPagesLimitAddr,
+          mAllocPagesForbiddenEnd
+          ));
+        return EFI_OUT_OF_RESOURCES;
+      }
+
+      break;
+
+    default:
+      return EFI_INVALID_PARAMETER;
+  }
+
+  return mOriginalAllocatePages (NewType, MemoryType, NumberOfPages, Memory);
+}
+
+STATIC
+EFI_STATUS
+InstallAllocatePagesLimit (
+  IN EFI_PHYSICAL_ADDRESS  LimitAddr,
+  IN EFI_PHYSICAL_ADDRESS  ForbiddenEndAddr
+  )
+{
+  UINT32  Crc;
+
+  if ((LimitAddr == 0) || mAllocPagesHookInstalled) {
+    return EFI_SUCCESS;
+  }
+
+  mAllocPagesLimitAddr    = LimitAddr;
+  mAllocPagesForbiddenEnd = ForbiddenEndAddr;
+  mOriginalAllocatePages  = gBS->AllocatePages;
+  gBS->AllocatePages      = AllocatePagesHook;
+
+  // AllocatePages lives in EFI_BOOT_SERVICES; refresh BS table CRC.
+  gBS->Hdr.CRC32 = 0;
+  gBS->CalculateCrc32 ((UINT8 *)gBS, gBS->Hdr.HeaderSize, &Crc);
+  gBS->Hdr.CRC32 = Crc;
+
+  mAllocPagesHookInstalled = TRUE;
+
+  DEBUG ((
+    DEBUG_ERROR,
+    "%a: EfiLoaderCode AllocateAddress forbidden in 0x%lx-0x%lx; Any/Max below 0x%lx\n",
+    __FUNCTION__,
+    mAllocPagesLimitAddr,
+    mAllocPagesForbiddenEnd,
+    mAllocPagesLimitAddr
+    ));
+
+  return EFI_SUCCESS;
+}
+
+/**
+  Find the last (highest PhysicalStart) EfiLoaderCode entry and compute:
+  LimitAddr = PhysicalStart + NumberOfPages * 4096
+              - PcdMemoryTypeEfiLoaderCode * 4096
+  EndAddr   = same as Entry[1].EndAddr:
+              EfiEntryTop.PhysicalStart + EfiEntryTop.NumberOfPages * 4096 - 1
+              (highest descriptor with PhysicalStart < 0x7ffffffff)
+**/
+STATIC
+EFI_STATUS
+GetLoaderCodeLimitAddr (
+  OUT EFI_PHYSICAL_ADDRESS  *LimitAddr,
+  OUT EFI_PHYSICAL_ADDRESS  *EndAddr
+  )
+{
+  EFI_STATUS             Status;
+  UINTN                  EfiMemoryMapSize;
+  EFI_MEMORY_DESCRIPTOR  *EfiMemoryMap;
+  EFI_MEMORY_DESCRIPTOR  *EfiMemoryMapEnd;
+  EFI_MEMORY_DESCRIPTOR  *EfiEntry;
+  EFI_MEMORY_DESCRIPTOR  LastLoaderCode;
+  EFI_MEMORY_DESCRIPTOR  EfiEntryTop;
+  UINTN                  EfiMapKey;
+  UINTN                  EfiDescriptorSize;
+  UINT32                 EfiDescriptorVersion;
+  UINT32                 LoaderCodePages;
+
+  if ((LimitAddr == NULL) || (EndAddr == NULL)) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  ZeroMem (&LastLoaderCode, sizeof (LastLoaderCode));
+  ZeroMem (&EfiEntryTop, sizeof (EfiEntryTop));
+  LastLoaderCode.Type = EfiLoaderCode;
+
+  EfiMemoryMapSize = 0;
+  EfiMemoryMap     = NULL;
+  Status           = gBS->GetMemoryMap (
+                            &EfiMemoryMapSize,
+                            EfiMemoryMap,
+                            &EfiMapKey,
+                            &EfiDescriptorSize,
+                            &EfiDescriptorVersion
+                            );
+  if (Status != EFI_BUFFER_TOO_SMALL) {
+    return Status;
+  }
+
+  do {
+    EfiMemoryMap = AllocatePool (EfiMemoryMapSize);
+    if (EfiMemoryMap == NULL) {
+      return EFI_OUT_OF_RESOURCES;
+    }
+
+    Status = gBS->GetMemoryMap (
+                    &EfiMemoryMapSize,
+                    EfiMemoryMap,
+                    &EfiMapKey,
+                    &EfiDescriptorSize,
+                    &EfiDescriptorVersion
+                    );
+    if (EFI_ERROR (Status)) {
+      FreePool (EfiMemoryMap);
+      EfiMemoryMap = NULL;
+    }
+  } while (Status == EFI_BUFFER_TOO_SMALL);
+
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+
+  EfiMemoryMapEnd = (EFI_MEMORY_DESCRIPTOR *)((UINT8 *)EfiMemoryMap + EfiMemoryMapSize);
+  for (EfiEntry = EfiMemoryMap; EfiEntry < EfiMemoryMapEnd; EfiEntry = NEXT_MEMORY_DESCRIPTOR (EfiEntry, EfiDescriptorSize)) {
+    // Only consider LoaderCode below 0x7ffffffff (same window as Entry[1]).
+    if ((EfiEntry->Type == EfiLoaderCode) &&
+        (EfiEntry->PhysicalStart < 0x7ffffffff) &&
+        (EfiEntry->PhysicalStart > LastLoaderCode.PhysicalStart))
+    {
+      LastLoaderCode.PhysicalStart = EfiEntry->PhysicalStart;
+      LastLoaderCode.NumberOfPages = EfiEntry->NumberOfPages;
+    }
+
+    // Same EndAddr selection as RecordUefiMemory Entry[1].EndAddr.
+    if ((EfiEntry->PhysicalStart < 0x7ffffffff) &&
+        (EfiEntry->PhysicalStart > EfiEntryTop.PhysicalStart))
+    {
+      EfiEntryTop.Type          = EfiEntry->Type;
+      EfiEntryTop.PhysicalStart = EfiEntry->PhysicalStart;
+      EfiEntryTop.NumberOfPages = EfiEntry->NumberOfPages;
+    }
+  }
+
+  FreePool (EfiMemoryMap);
+
+  if (LastLoaderCode.NumberOfPages == 0) {
+    DEBUG ((DEBUG_ERROR, "%a: no EfiLoaderCode entry found\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  if (EfiEntryTop.NumberOfPages == 0) {
+    DEBUG ((DEBUG_ERROR, "%a: no EfiEntryTop found for EndAddr\n", __FUNCTION__));
+    return EFI_NOT_FOUND;
+  }
+
+  LoaderCodePages = PcdGet32 (PcdMemoryTypeEfiLoaderCode);
+  *LimitAddr      = LastLoaderCode.PhysicalStart +
+                    LastLoaderCode.NumberOfPages * (UINT64)EFI_PAGE_SIZE -
+                    (UINT64)LoaderCodePages * EFI_PAGE_SIZE;
+  *EndAddr        = EfiEntryTop.PhysicalStart + EfiEntryTop.NumberOfPages * 4096 - 1;
+
+  DEBUG ((
+    DEBUG_ERROR,
+    "%a: last LoaderCode 0x%lx pages 0x%lx, LimitAddr 0x%lx EndAddr 0x%lx\n",
+    __FUNCTION__,
+    LastLoaderCode.PhysicalStart,
+    LastLoaderCode.NumberOfPages,
+    *LimitAddr,
+    *EndAddr
+    ));
+
+  return EFI_SUCCESS;
+}
+
+STATIC
+VOID
+EFIAPI
+ReadyToBootAllocatePagesLimitNotify (
+  IN EFI_EVENT  Event,
+  IN VOID       *Context
+  )
+{
+  EFI_STATUS            Status;
+  EFI_PHYSICAL_ADDRESS  LoaderCodeAddr;
+  EFI_PHYSICAL_ADDRESS  LimitAddr;
+  EFI_PHYSICAL_ADDRESS  EndAddr;
+  UINTN                 Pages;
+  void                  *SmemUefiBottom;
+  UINT32                SmemSize;
+  MEMORY_RECORD_STRUCT  *pMemRecStruct;
+
+  Pages = 10;
+
+  // Reserve an EfiLoaderCode block so memmap has a LoaderCode entry for LimitAddr.
+  LoaderCodeAddr = 0;
+  Status         = gBS->AllocatePages (
+                          AllocateAnyPages,
+                          EfiLoaderCode,
+                          Pages,
+                          &LoaderCodeAddr
+                          );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "%a: AllocatePages EfiLoaderCode failed %r\n", __FUNCTION__, Status));
+    return;
+  }
+
+  DEBUG ((
+    DEBUG_ERROR,
+    "%a: reserved EfiLoaderCode at 0x%lx pages 0x%lx\n",
+    __FUNCTION__,
+    LoaderCodeAddr,
+    (UINT64)Pages
+    ));
+
+  Status = GetLoaderCodeLimitAddr (&LimitAddr, &EndAddr);
+  if (EFI_ERROR (Status) || (LimitAddr == 0) || (EndAddr < LimitAddr)) {
+    DEBUG ((DEBUG_ERROR, "%a: GetLoaderCodeLimitAddr failed %r\n", __FUNCTION__, Status));
+    return;
+  }
+
+  // Keep Entry[1] consistent with the protected window used by the hook.
+  SmemUefiBottom = SmemGetAddr (SMEM_ADDR_UEFI_MEM_BOTTOM, &SmemSize);
+  if (SmemUefiBottom != NULL) {
+    pMemRecStruct                     = (MEMORY_RECORD_STRUCT *)SmemUefiBottom;
+    pMemRecStruct->Signature          = MEMORY_RECORD_STRUCT_SIGNATURE;
+    pMemRecStruct->EntryCount         = 2;
+    pMemRecStruct->Entry[0].StartAddr = PcdGet64 (PcdFdBaseAddress);
+    pMemRecStruct->Entry[0].EndAddr   = PcdGet64 (PcdFdBaseAddress) + PcdGet32 (PcdFdSize) - 1;
+    pMemRecStruct->Entry[1].StartAddr = LimitAddr;
+    pMemRecStruct->Entry[1].EndAddr   = EndAddr;
+    WriteBackDataCacheRange ((VOID *)(UINTN)SmemUefiBottom, (UINTN)SmemSize);
+  }
+
+  InstallAllocatePagesLimit (LimitAddr, EndAddr);
+
+  gBS->CloseEvent (Event);
+}
+
 EFI_STATUS
 EFIAPI
 RecordUefiMemory (
@@ -542,8 +848,15 @@ RecordUefiMemory (
   pMemRecStruct->EntryCount         = 2;
   pMemRecStruct->Entry[0].StartAddr = PcdGet64 (PcdFdBaseAddress);
   pMemRecStruct->Entry[0].EndAddr   = PcdGet64 (PcdFdBaseAddress) + PcdGet32 (PcdFdSize) - 1;
-  pMemRecStruct->Entry[1].StartAddr = EfiEntryBottom.PhysicalStart + EfiEntryBottom.NumberOfPages*4096 - PcdGet32 (PcdMemoryTypeEfiLoaderCode)*4096;
-  pMemRecStruct->Entry[1].EndAddr   = EfiEntryTop.PhysicalStart + EfiEntryTop.NumberOfPages*4096 - 1;
+  if (mAllocPagesLimitAddr != 0) {
+    pMemRecStruct->Entry[1].StartAddr = mAllocPagesLimitAddr;
+  } else {
+    pMemRecStruct->Entry[1].StartAddr = EfiEntryBottom.PhysicalStart +
+                                        EfiEntryBottom.NumberOfPages * 4096 -
+                                        (UINT64)PcdGet32 (PcdMemoryTypeEfiLoaderCode) * 4096;
+  }
+
+  pMemRecStruct->Entry[1].EndAddr = EfiEntryTop.PhysicalStart + EfiEntryTop.NumberOfPages * 4096 - 1;
 
   DEBUG ((DEBUG_ERROR | DEBUG_PAGE, "===========================%S============================== End\n", L" MemMap"));
   WriteBackDataCacheRange ((VOID *)(UINTN)SmemUefiBottom, (UINTN)SmemSize);
@@ -568,7 +881,8 @@ RecordUefiMemoryNotify (
 }
 
 static EFI_EVENT  mExitBootServicesEvent;
-// static EFI_EVENT  ReadyToBootEvent;
+static EFI_EVENT  mReadyToBootAllocLimitEvent;
+
 VOID
 EFIAPI
 RecordUefiMemoryWrapper (
@@ -576,18 +890,16 @@ RecordUefiMemoryWrapper (
 {
   EFI_STATUS  Status;
 
-  // Status = gBS->CreateEventEx (
-  //                              EVT_NOTIFY_SIGNAL,
-  //                              TPL_CALLBACK,
-  //                              ReserveUefiMemoryNotify,
-  //                              NULL,
-  //                              &gEfiEventReadyToBootGuid,
-  //                              &ReadyToBootEvent
-  //                              );
-  // ASSERT_EFI_ERROR (Status);
-  //
-  // Register the notify function to update FPDT on ExitBootServices Event.
-  //
+  // ReadyToBoot: reserve EfiLoaderCode, compute LimitAddr, hook AllocatePages.
+  Status = EfiCreateEventReadyToBootEx (
+             TPL_CALLBACK,
+             ReadyToBootAllocatePagesLimitNotify,
+             NULL,
+             &mReadyToBootAllocLimitEvent
+             );
+  ASSERT_EFI_ERROR (Status);
+
+  // ExitBootServices: finalize memory record.
   Status = gBS->CreateEventEx (
                   EVT_NOTIFY_SIGNAL,
                   TPL_NOTIFY,

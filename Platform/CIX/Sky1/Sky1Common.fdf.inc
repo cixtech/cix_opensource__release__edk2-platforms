@@ -145,6 +145,9 @@
 !if $(POWER_BUTTON_ENABLE) == TRUE
   INF Platform/CIX/Sky1/Drivers/PowerButtonDxe/PowerButtonDxe.inf
 !endif
+!if $(GPIO_POWER_BUTTON_ENABLE) == TRUE
+  INF Platform/CIX/Sky1/Drivers/PowerButtonDxe/GpioPowerButtonDxe.inf
+!endif
 
 #  INF MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
   INF Silicon/CIX/Sky1/Drivers/GenericWatchdogDxe/GenericWatchdogDxe.inf

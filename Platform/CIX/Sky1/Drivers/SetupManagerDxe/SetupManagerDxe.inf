@@ -249,6 +249,7 @@
   gCixTokenSpaceGuid.PcdAcpiCppcType
   gCixTokenSpaceGuid.PcdSPEEn
   gCixPlatformTokenSpaceGuid.PcdRegisterFastBootSupport
+  gCixPlatformTokenSpaceGuid.PcdBiosBackupRecovery
 
 [Depex]
   TRUE

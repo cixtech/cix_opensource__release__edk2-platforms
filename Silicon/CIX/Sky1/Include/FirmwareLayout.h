@@ -77,15 +77,26 @@ typedef struct {
   FIP_TOC_ENTRY     Entries[1];
 } FIP_TOC_FORMAT;
 
+typedef struct {
+  UINT8    RecoveryMode;
+  UINT8    BootState;
+  UINT8    BootRetryCount;
+} BOOT_LOADER_3_RECOVERY_CONFIG_DATA;
+
 #pragma pack()
 
 typedef enum {
-  BOOT_LOADER_1  = 1,
-  BOOT_LOADER_2  = 2,
-  MEMORY_CONFIGS = 3,
-  CSU_PM_CONFIGS = 4,
-  SECURE_DEBUG   = 5,
-  UEFI_NVRAM     = 100
+  BOOT_LOADER_1                 = 1,
+  BOOT_LOADER_2                 = 2,
+  MEMORY_CONFIGS                = 3,
+  CSU_PM_CONFIGS                = 4,
+  SECURE_DEBUG                  = 5,
+  UEFI_NVRAM                    = 100,
+  SE_CONFIG                     = 6,
+  BOOT_LOADER_3                 = 7,
+  SFH_FW                        = 8,
+  BOOT_LOADER_3_BACKUP          = 104, // boot3 backup
+  BOOT_LOADER_3_RECOVERY_CONFIG = 105, // boot3 recovery config
 } FIRMWARE_TYPE;
 
 typedef enum {
